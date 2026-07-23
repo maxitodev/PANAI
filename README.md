@@ -1,8 +1,10 @@
 # PANAI — Demo web
 
-Página de demostración del traductor **PANAI** hecha con **Next.js**. No
-reimplementa nada del traductor: cada petición ejecuta el pipeline real de la
-carpeta `../files` (`traductor.py`, hecho con PLY) y muestra el resultado.
+Página de demostración del traductor **PANAI** hecha con **Next.js** (frontend)
+y una **función Python con Flask** (backend). El backend importa el traductor
+real (lexer, parser, semántico, generador) y corre el pipeline en el mismo
+proceso — no reimplementa nada. Sigue el patrón oficial de Vercel para
+Next.js + Python, así que se puede desplegar a Vercel tal cual.
 
 ## Qué muestra
 
@@ -15,55 +17,75 @@ carpeta `../files` (`traductor.py`, hecho con PLY) y muestra el resultado.
    código generado:
    - **Respuesta directa (sin IA):** ejecuta las funciones `manejar_*` (el
      `if/else` que se tradujo desde el `si/sino` del DSL). No necesita API key.
-   - **Respuesta del modelo (opcional):** si activas la casilla y pegas tu API
-     key de OpenAI, llama al modelo real. El desplegable *Cargar modelos*
-     consulta a OpenAI qué modelos puede usar tu key.
+   - **Respuesta del modelo (opcional):** menú desplegable de modelos + campo
+     para tu API key de OpenAI. *Cargar modelos* consulta a OpenAI qué modelos
+     puede usar tu key.
 
-## Requisitos
+## Requisitos (local)
 
-- **Node.js 18+** (para Next.js).
-- **Python 3** con **PLY** (`pip install ply`) y, solo si vas a llamar al
-  modelo real, **OpenAI** (`pip install openai`). El `python` debe estar en el
-  PATH (o define la variable `PANAI_PYTHON` con la ruta al ejecutable).
-- La carpeta `../files` con el traductor debe existir junto a esta (`demo-web`
-  y `files` son hermanas).
+- **Node.js 18+**
+- **Python 3** con `pip install flask ply openai` (o `pip install -r requirements.txt`)
 
-## Cómo correr
+## Cómo correr en local
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abre http://localhost:3000.
+`npm run dev` arranca **dos** procesos con `concurrently`: Next.js (puerto
+3000) y Flask (puerto 5328). En desarrollo, Next redirige `/api/*` a Flask
+(ver `next.config.ts`). Abre http://localhost:3000.
 
-## Sobre la API key (importante para la demo)
+## Cómo subir a Vercel
+
+1. Crea una cuenta en [vercel.com](https://vercel.com) (con GitHub es lo más fácil).
+2. **Opción A — con GitHub:** sube la carpeta `demo-web` como repositorio y en
+   Vercel haz *Import Project*. Vercel detecta Next.js y las funciones Python
+   automáticamente. No hay nada que configurar.
+3. **Opción B — sin GitHub (CLI):**
+   ```bash
+   npm i -g vercel
+   cd demo-web
+   vercel
+   ```
+   Sigue las preguntas (todas con Enter) y al final te da la URL pública.
+
+Notas del despliegue:
+
+- `requirements.txt` le dice a Vercel qué paquetes de Python instalar.
+- `vercel.json` sube el límite de tiempo de la función a 60 s (las llamadas al
+  modelo pueden tardar).
+- `api/_panai/` es una **copia** del traductor de `../files` (el guion bajo
+  evita que Vercel exponga esos archivos como endpoints). El único cambio es
+  `yacc.yacc(write_tables=False, debug=False)`, porque el sistema de archivos
+  de Vercel es de solo lectura. **La fuente de verdad sigue siendo `files/`**:
+  si cambias el traductor, vuelve a copiar los archivos.
+
+## Sobre la API key
 
 - La key **no se guarda en disco ni se registra en logs**. Viaja del navegador
-  al server local de Next, que la pasa como variable de entorno
-  (`OPENAI_API_KEY`) únicamente al proceso Python que ejecuta el código
-  generado. En el navegador se conserva solo en `sessionStorage` (se borra al
-  cerrar la pestaña) para que un refresh accidental no la pierda a mitad de la
-  presentación.
-- El modelo elegido se pasa por la variable `PANAI_MODELO`, que es la que lee
-  el código generado por el traductor. Así se puede cambiar de modelo sin
-  volver a traducir.
-- Si vas a demostrar **sin internet**, deja la casilla apagada: la respuesta
-  directa (`manejar_*`) funciona sin key ni red, y es la que mejor prueba la
-  traducción DSL → Python.
+  al backend, que la usa como variable de entorno solo durante esa petición y
+  restaura el entorno al terminar. En el navegador vive en `sessionStorage`
+  (se borra al cerrar la pestaña).
+- El modelo se elige en un menú desplegable y se pasa por la variable
+  `PANAI_MODELO`, que lee el código generado — se puede cambiar de modelo sin
+  re-traducir.
+- Para demostrar **sin internet**: deja la casilla del modelo apagada; la
+  respuesta directa (`manejar_*`) funciona sin key ni red.
 
 ## Estructura
 
 ```
 demo-web/
 ├── app/
-│   ├── page.tsx              # UI (editor, fases, ejecución)
-│   └── api/
-│       ├── traducir/route.ts # POST: corre el pipeline y regresa código/errores
-│       ├── ejecutar/route.ts # POST: traduce + ejecuta el código generado
-│       └── modelos/route.ts  # POST: lista modelos de OpenAI para una key
-├── lib/
-│   ├── panai.ts              # invoca Python, resume fases, extrae errores
-│   └── ejemplos.ts           # los 7 programas .panai precargados
-└── runner.py                 # ejecuta el .py generado y regresa JSON
+│   └── page.tsx              # UI completa (editor, fases, ejecución, landing)
+├── api/
+│   ├── index.py              # Backend Flask: /api/traducir, /api/ejecutar, /api/modelos
+│   └── _panai/               # Copia del traductor real (para el despliegue)
+├── lib/ejemplos.ts           # Los 7 programas .panai precargados
+├── public/                   # Logos (PANAI y UAM)
+├── requirements.txt          # Dependencias Python para Vercel
+├── vercel.json               # maxDuration de la función Python
+└── next.config.ts            # Rewrites /api/* → Flask (dev) / función (prod)
 ```
