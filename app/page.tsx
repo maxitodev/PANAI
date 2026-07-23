@@ -294,15 +294,15 @@ export default function Home() {
         {/* Línea de acento con el gradiente del logo */}
         <div className="h-1 w-full bg-gradient-to-r from-[#00f0e0] via-[#2060f0] to-[#5020f0]" />
         <nav className="border-b border-slate-200/80 bg-white/85 backdrop-blur-md">
-          <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
+          <div className="mx-auto flex h-20 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
             <a href="#" className="flex items-center" aria-label="PANAI — inicio">
               <Image
                 src="/panai-logo-light.png"
                 alt="PANAI"
-                width={73}
-                height={60}
+                width={158}
+                height={130}
                 priority
-                className="h-9 w-auto"
+                className="h-16 w-auto"
               />
             </a>
             <div className="flex items-center gap-1 sm:gap-4">
@@ -332,7 +332,7 @@ export default function Home() {
         </nav>
       </div>
 
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-28 pb-10 sm:px-6">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 pt-32 pb-10 sm:px-6">
       {/* ─────────────── Hero ─────────────── */}
       <header className="mb-14 grid items-center gap-8 lg:grid-cols-[1.2fr_1fr]">
         <div>
