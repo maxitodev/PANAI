@@ -5,23 +5,30 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* Paleta tomada del logo PANAI: cian #00f0e0 → azul #2060f0 → violeta #5020f0 */
+/* Paleta tomada del logo PANAI: cian #00f0e0 → azul #2060f0 → violeta #5020f0
+   (para texto sobre fondo claro se usa un teal mas oscuro: #009e93) */
 :root {
   --panai-cian: #00f0e0;
   --panai-azul: #2060f0;
   --panai-violeta: #5020f0;
+  --panai-teal-texto: #009e93;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
+/* Tema claro (fondo blanco) con un resplandor azul muy sutil arriba */
 body {
   background:
-    radial-gradient(60rem 30rem at 50% -12rem, rgba(32, 96, 240, 0.14), transparent 70%),
-    #05070f;
-  color: #e2e8f0;
+    radial-gradient(60rem 28rem at 50% -14rem, rgba(32, 96, 240, 0.07), transparent 70%),
+    #ffffff;
+  color: #334155;
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
 ::selection {
-  background: rgba(0, 240, 224, 0.25);
+  background: rgba(0, 240, 224, 0.3);
 }
 
 /* Botón primario con el gradiente del logo */
@@ -32,7 +39,7 @@ body {
   transition: filter 0.15s ease, opacity 0.15s ease;
 }
 .btn-grad:hover:not(:disabled) {
-  filter: brightness(1.15);
+  filter: brightness(1.1);
 }
 .btn-grad:disabled {
   opacity: 0.45;
@@ -40,7 +47,7 @@ body {
 
 /* Texto con gradiente (para acentos puntuales) */
 .grad-text {
-  background-image: linear-gradient(90deg, var(--panai-cian), var(--panai-azul), var(--panai-violeta));
+  background-image: linear-gradient(90deg, #00c9bb, var(--panai-azul), var(--panai-violeta));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -69,7 +76,7 @@ textarea::-webkit-scrollbar {
 }
 pre::-webkit-scrollbar-thumb,
 textarea::-webkit-scrollbar-thumb {
-  background: #253052;
+  background: #cbd5e1;
   border-radius: 5px;
 }
 pre::-webkit-scrollbar-track,
