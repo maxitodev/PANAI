@@ -230,7 +230,7 @@ EXCLUIR_OPENAI = re.compile(
 INCLUIR_OPENAI = re.compile(r"^(gpt-|o\d)")
 
 EXCLUIR_GEMINI = re.compile(
-    r"(embedding|imagen|veo|tts|audio|live|robotics|learnlm|aqa|vision|image)",
+    r"(embedding|imagen|veo|tts|audio|live|robotics|learnlm|aqa|vision|image|omni|translate)",
     re.IGNORECASE,
 )
 

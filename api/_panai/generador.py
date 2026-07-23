@@ -59,7 +59,7 @@ def _generar_encabezado():
         '# "gemini" (por defecto, tiene tier gratuito) u "openai"\n'
         'PROVEEDOR = os.environ.get("PANAI_PROVEEDOR", "gemini")\n'
         'MODELO = os.environ.get("PANAI_MODELO") or (\n'
-        '    "gemini-2.5-flash" if PROVEEDOR == "gemini" else "gpt-4o-mini"\n'
+        '    "gemini-3.6-flash" if PROVEEDOR == "gemini" else "gpt-4o-mini"\n'
         ")"
     )
 

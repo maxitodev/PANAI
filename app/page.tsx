@@ -67,10 +67,11 @@ type Proveedor = "gemini" | "openai";
 // modelos» la lista se reemplaza por los disponibles reales para tu API key.
 const MODELOS_BASE: Record<Proveedor, string[]> = {
   gemini: [
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-pro",
-    "gemini-2.0-flash",
+    "gemini-3.6-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-3.1-flash-lite",
+    "gemini-3.1-pro-preview",
   ],
   openai: [
     "gpt-4o-mini",
