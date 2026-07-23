@@ -136,14 +136,17 @@ def ejecutar():
     pregunta = body.get("pregunta")
     api_key = body.get("apiKey")
     modelo = body.get("modelo")
+    proveedor = body.get("proveedor")
     llamar_modelo = body.get("llamarModelo") is True
 
+    if proveedor not in ("gemini", "openai"):
+        proveedor = "gemini"
     if not isinstance(codigo, str) or not codigo.strip():
         return jsonify({"error": "Falta el código fuente PANAI"}), 400
     if not isinstance(pregunta, str) or not pregunta.strip():
         return jsonify({"error": "Escribe una pregunta para el agente"}), 400
     if llamar_modelo and (not isinstance(api_key, str) or not api_key.strip()):
-        return jsonify({"error": "Para llamar al modelo real necesitas pegar tu API key de OpenAI"}), 400
+        return jsonify({"error": "Para llamar al modelo real necesitas pegar tu API key"}), 400
 
     # 1) Traducir. Si hay errores, se reportan igual que en /api/traducir.
     ok, log, codigo_generado, _ast = correr_pipeline(codigo)
@@ -161,11 +164,15 @@ def ejecutar():
     resultado = {"directas": [], "modelo": None, "error_modelo": None, "error": None}
     entorno_previo = {
         "OPENAI_API_KEY": os.environ.get("OPENAI_API_KEY"),
+        "GEMINI_API_KEY": os.environ.get("GEMINI_API_KEY"),
         "PANAI_MODELO": os.environ.get("PANAI_MODELO"),
+        "PANAI_PROVEEDOR": os.environ.get("PANAI_PROVEEDOR"),
     }
     try:
+        os.environ["PANAI_PROVEEDOR"] = proveedor
         if llamar_modelo:
-            os.environ["OPENAI_API_KEY"] = api_key.strip()
+            clave_env = "GEMINI_API_KEY" if proveedor == "gemini" else "OPENAI_API_KEY"
+            os.environ[clave_env] = api_key.strip()
         if isinstance(modelo, str) and modelo.strip():
             os.environ["PANAI_MODELO"] = modelo.strip()
 
@@ -212,38 +219,61 @@ def ejecutar():
 
 
 # ---------------------------------------------------------------------------
-# POST /api/modelos  { apiKey }
+# POST /api/modelos  { apiKey, proveedor }
+# Consulta la lista de modelos del proveedor elegido. Ambos exponen el mismo
+# formato (Gemini via su endpoint OpenAI-compatible).
 # ---------------------------------------------------------------------------
-EXCLUIR_MODELOS = re.compile(
+EXCLUIR_OPENAI = re.compile(
     r"(audio|realtime|image|tts|transcribe|whisper|embed|moderation|dall|search|instruct|computer-use|codex)",
     re.IGNORECASE,
 )
-INCLUIR_MODELOS = re.compile(r"^(gpt-|o\d)")
+INCLUIR_OPENAI = re.compile(r"^(gpt-|o\d)")
+
+EXCLUIR_GEMINI = re.compile(
+    r"(embedding|imagen|veo|tts|audio|live|robotics|learnlm|aqa|vision|image)",
+    re.IGNORECASE,
+)
 
 
 @app.route("/api/modelos", methods=["POST"])
 def modelos():
     body = request.get_json(silent=True) or {}
     api_key = body.get("apiKey")
+    proveedor = body.get("proveedor")
+    if proveedor not in ("gemini", "openai"):
+        proveedor = "gemini"
     if not isinstance(api_key, str) or not api_key.strip():
         return jsonify({"error": "Falta la API key"}), 400
 
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/openai/models"
+        if proveedor == "gemini"
+        else "https://api.openai.com/v1/models"
+    )
+    nombre_proveedor = "Gemini" if proveedor == "gemini" else "OpenAI"
+
     peticion = urllib.request.Request(
-        "https://api.openai.com/v1/models",
-        headers={"Authorization": f"Bearer {api_key.strip()}"},
+        url, headers={"Authorization": f"Bearer {api_key.strip()}"},
     )
     try:
         with urllib.request.urlopen(peticion, timeout=15) as respuesta:
             data = json.loads(respuesta.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        if e.code == 401:
-            return jsonify({"error": "API key inválida (OpenAI respondió 401)"}), 401
-        return jsonify({"error": f"OpenAI respondió {e.code}"}), 502
+        if e.code in (401, 403):
+            return jsonify({"error": f"API key inválida ({nombre_proveedor} respondió {e.code})"}), 401
+        return jsonify({"error": f"{nombre_proveedor} respondió {e.code}"}), 502
     except Exception:
-        return jsonify({"error": "No se pudo contactar a api.openai.com (¿hay internet?)"}), 502
+        return jsonify({"error": f"No se pudo contactar a {nombre_proveedor} (¿hay internet?)"}), 502
 
-    ids = sorted(
-        m["id"] for m in data.get("data", [])
-        if INCLUIR_MODELOS.search(m.get("id", "")) and not EXCLUIR_MODELOS.search(m.get("id", ""))
-    )
-    return jsonify({"modelos": ids})
+    ids = []
+    for m in data.get("data", []):
+        # Gemini regresa ids como "models/gemini-2.5-flash": se quita el prefijo.
+        mid = m.get("id", "").removeprefix("models/")
+        if proveedor == "gemini":
+            if mid.startswith("gemini") and not EXCLUIR_GEMINI.search(mid):
+                ids.append(mid)
+        else:
+            if INCLUIR_OPENAI.search(mid) and not EXCLUIR_OPENAI.search(mid):
+                ids.append(mid)
+
+    return jsonify({"modelos": sorted(set(ids))})

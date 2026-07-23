@@ -40,9 +40,11 @@ def generar_codigo(ast):
 # Encabezado: imports y cliente de OpenAI
 # ---------------------------------------------------------------------------
 def _generar_encabezado():
-    # El modelo se puede cambiar sin re-traducir via la variable de entorno
-    # PANAI_MODELO (la usa la pagina de demostracion). El cliente de OpenAI
-    # NO se crea aqui a nivel de modulo: si no hay OPENAI_API_KEY definida,
+    # El proveedor (gemini u openai) y el modelo se eligen por variables de
+    # entorno, sin re-traducir el programa (la pagina de demostracion usa
+    # esto). Gemini expone un endpoint compatible con el SDK de OpenAI, asi
+    # que el codigo generado usa UN solo SDK para ambos proveedores. El
+    # cliente NO se crea a nivel de modulo: si no hay API key definida,
     # OpenAI() lanza un error al importar y eso impediria usar las funciones
     # manejar_* (que son traduccion pura del DSL y no necesitan ninguna key).
     # Por eso el cliente se crea dentro de responder(), que es la unica
@@ -54,7 +56,11 @@ def _generar_encabezado():
         "import os\n"
         "from dataclasses import dataclass\n"
         "from openai import OpenAI\n\n\n"
-        'MODELO = os.environ.get("PANAI_MODELO", "gpt-4o-mini")'
+        '# "gemini" (por defecto, tiene tier gratuito) u "openai"\n'
+        'PROVEEDOR = os.environ.get("PANAI_PROVEEDOR", "gemini")\n'
+        'MODELO = os.environ.get("PANAI_MODELO") or (\n'
+        '    "gemini-2.5-flash" if PROVEEDOR == "gemini" else "gpt-4o-mini"\n'
+        ")"
     )
 
 
@@ -186,16 +192,28 @@ def _generar_un_manejador(evento):
 # Funcion que realmente llama al modelo (usa las instrucciones del agente)
 # ---------------------------------------------------------------------------
 def _generar_funcion_responder(ast):
+    # Se usa la API chat.completions (y no responses) porque es la que el
+    # endpoint OpenAI-compatible de Gemini tambien implementa: el mismo
+    # codigo generado funciona con ambos proveedores cambiando solo las
+    # variables de entorno.
     variable = _a_mayus_snake(ast['nombre'])
     return (
         "def responder(pregunta):\n"
-        "    client = OpenAI()  # lee OPENAI_API_KEY del entorno\n"
-        "    respuesta = client.responses.create(\n"
+        '    if PROVEEDOR == "gemini":\n'
+        "        client = OpenAI(  # endpoint OpenAI-compatible de Gemini\n"
+        '            api_key=os.environ.get("GEMINI_API_KEY", ""),\n'
+        '            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",\n'
+        "        )\n"
+        "    else:\n"
+        "        client = OpenAI()  # lee OPENAI_API_KEY del entorno\n"
+        "    respuesta = client.chat.completions.create(\n"
         "        model=MODELO,\n"
-        f"        instructions=construir_instrucciones({variable}),\n"
-        "        input=construir_entrada_modelo(pregunta),\n"
+        "        messages=[\n"
+        f'            {{"role": "system", "content": construir_instrucciones({variable})}},\n'
+        '            {"role": "user", "content": construir_entrada_modelo(pregunta)},\n'
+        "        ],\n"
         "    )\n"
-        "    return respuesta.output_text"
+        "    return respuesta.choices[0].message.content"
     )
 
 

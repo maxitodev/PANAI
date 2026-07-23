@@ -17,9 +17,11 @@ Next.js + Python, así que se puede desplegar a Vercel tal cual.
    código generado:
    - **Respuesta directa (sin IA):** ejecuta las funciones `manejar_*` (el
      `if/else` que se tradujo desde el `si/sino` del DSL). No necesita API key.
-   - **Respuesta del modelo (opcional):** menú desplegable de modelos + campo
-     para tu API key de OpenAI. *Cargar modelos* consulta a OpenAI qué modelos
-     puede usar tu key.
+   - **Respuesta del modelo (opcional):** eliges proveedor — **Gemini
+     (por defecto, key gratis en aistudio.google.com/apikey)** u OpenAI —,
+     el modelo en un menú desplegable, y pegas tu API key. *Cargar modelos*
+     consulta al proveedor qué modelos puede usar tu key. Ambos proveedores
+     usan el mismo SDK: Gemini se llama por su endpoint OpenAI-compatible.
 
 ## Requisitos (local)
 
@@ -68,9 +70,10 @@ Notas del despliegue:
   al backend, que la usa como variable de entorno solo durante esa petición y
   restaura el entorno al terminar. En el navegador vive en `sessionStorage`
   (se borra al cerrar la pestaña).
-- El modelo se elige en un menú desplegable y se pasa por la variable
-  `PANAI_MODELO`, que lee el código generado — se puede cambiar de modelo sin
-  re-traducir.
+- El proveedor y el modelo se eligen en la interfaz y se pasan por las
+  variables `PANAI_PROVEEDOR` y `PANAI_MODELO`, que lee el código generado —
+  se puede cambiar de proveedor/modelo sin re-traducir. La key va en
+  `GEMINI_API_KEY` u `OPENAI_API_KEY` según el proveedor.
 - Para demostrar **sin internet**: deja la casilla del modelo apagada; la
   respuesta directa (`manejar_*`) funciona sin key ni red.
 

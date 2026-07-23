@@ -61,18 +61,48 @@ const NOMBRES_FASE: Array<[keyof Fases, string]> = [
   ["generacion", "Generación"],
 ];
 
-// Modelos comunes de OpenAI para el menú desplegable. Con «Cargar modelos»
-// la lista se reemplaza por los modelos reales disponibles para tu API key.
-const MODELOS_BASE = [
-  "gpt-4o-mini",
-  "gpt-4o",
-  "gpt-4.1-mini",
-  "gpt-4.1",
-  "gpt-5-nano",
-  "gpt-5-mini",
-  "gpt-5",
-  "gpt-5.1",
-];
+type Proveedor = "gemini" | "openai";
+
+// Modelos comunes por proveedor para el menú desplegable. Con «Cargar
+// modelos» la lista se reemplaza por los disponibles reales para tu API key.
+const MODELOS_BASE: Record<Proveedor, string[]> = {
+  gemini: [
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-pro",
+    "gemini-2.0-flash",
+  ],
+  openai: [
+    "gpt-4o-mini",
+    "gpt-4o",
+    "gpt-4.1-mini",
+    "gpt-4.1",
+    "gpt-5-nano",
+    "gpt-5-mini",
+    "gpt-5",
+    "gpt-5.1",
+  ],
+};
+
+const INFO_PROVEEDOR: Record<
+  Proveedor,
+  { nombre: string; urlKey: string; urlKeyCorta: string; nota: string; placeholder: string }
+> = {
+  gemini: {
+    nombre: "Gemini",
+    urlKey: "https://aistudio.google.com/apikey",
+    urlKeyCorta: "aistudio.google.com/apikey",
+    nota: "gratis, con tu cuenta de Google",
+    placeholder: "AIza…",
+  },
+  openai: {
+    nombre: "OpenAI",
+    urlKey: "https://platform.openai.com/api-keys",
+    urlKeyCorta: "platform.openai.com/api-keys",
+    nota: "requiere saldo en la cuenta",
+    placeholder: "sk-…",
+  },
+};
 
 function FaseChip({ nombre, estado }: { nombre: string; estado: EstadoFase }) {
   const punto: Record<EstadoFase, string> = {
@@ -104,8 +134,9 @@ export default function Home() {
   const [pregunta, setPregunta] = useState(
     "Tengo examen de calculo, como puedo estudiar?",
   );
+  const [proveedor, setProveedor] = useState<Proveedor>("gemini");
   const [apiKey, setApiKey] = useState("");
-  const [modelo, setModelo] = useState("gpt-4o-mini");
+  const [modelo, setModelo] = useState(MODELOS_BASE.gemini[0]);
   const [modelos, setModelos] = useState<string[]>([]);
   const [cargandoModelos, setCargandoModelos] = useState(false);
   const [llamarModelo, setLlamarModelo] = useState(false);
@@ -117,14 +148,22 @@ export default function Home() {
 
   // La key se conserva solo en sessionStorage (misma pestaña) para que un
   // refresh accidental durante la presentación no obligue a pegarla de nuevo.
+  // Se guarda una key por proveedor (Gemini y OpenAI usan keys distintas).
   useEffect(() => {
-    const guardada = sessionStorage.getItem("panai_api_key");
-    if (guardada) setApiKey(guardada);
-  }, []);
+    setApiKey(sessionStorage.getItem(`panai_api_key_${proveedor}`) ?? "");
+  }, [proveedor]);
   useEffect(() => {
-    if (apiKey) sessionStorage.setItem("panai_api_key", apiKey);
-    else sessionStorage.removeItem("panai_api_key");
-  }, [apiKey]);
+    if (apiKey) sessionStorage.setItem(`panai_api_key_${proveedor}`, apiKey);
+    else sessionStorage.removeItem(`panai_api_key_${proveedor}`);
+  }, [apiKey, proveedor]);
+
+  // Al cambiar de proveedor: modelo por defecto de ese proveedor y se
+  // descarta la lista cargada del proveedor anterior.
+  const cambiarProveedor = (p: Proveedor) => {
+    setProveedor(p);
+    setModelos([]);
+    setModelo(MODELOS_BASE[p][0]);
+  };
 
   const fases = ejecucion?.fases ?? traduccion?.fases ?? FASES_INICIALES;
 
@@ -174,7 +213,7 @@ export default function Home() {
       const res = await fetch("/api/modelos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey }),
+        body: JSON.stringify({ apiKey, proveedor }),
       });
       const data: { modelos?: string[]; error?: string } = await res.json();
       if (data.error) {
@@ -199,7 +238,7 @@ export default function Home() {
       const res = await fetch("/api/ejecutar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ codigo, pregunta, apiKey, modelo, llamarModelo }),
+        body: JSON.stringify({ codigo, pregunta, apiKey, modelo, proveedor, llamarModelo }),
       });
       const data: RespuestaEjecutar = await res.json();
       if (data.error) {
@@ -409,14 +448,38 @@ export default function Home() {
                 onChange={(e) => setLlamarModelo(e.target.checked)}
                 className="accent-[#2060f0]"
               />
-              Llamar al modelo real de OpenAI
+              Llamar al modelo real (Gemini u OpenAI)
             </label>
 
             {llamarModelo && (
               <div className="space-y-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
                 <div>
+                  <label className="mb-1.5 block text-xs text-slate-500">Proveedor</label>
+                  <div className="flex rounded-xl border border-white/10 bg-white/[0.03] p-1">
+                    {(["gemini", "openai"] as const).map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => cambiarProveedor(p)}
+                        className={`flex-1 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                          proveedor === p
+                            ? "btn-grad"
+                            : "text-slate-400 hover:text-slate-200"
+                        }`}
+                      >
+                        {INFO_PROVEEDOR[p].nombre}
+                        {p === "gemini" && (
+                          <span className={proveedor === p ? " opacity-80" : " text-slate-600"}>
+                            {" "}· gratis
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
                   <label className="mb-1.5 block text-xs text-slate-500">
-                    API key{" "}
+                    API key de {INFO_PROVEEDOR[proveedor].nombre}{" "}
                     <span className="text-slate-600">
                       · solo se usa en tu máquina, nunca se guarda
                     </span>
@@ -427,18 +490,19 @@ export default function Home() {
                     onChange={(e) => setApiKey(e.target.value)}
                     autoComplete="off"
                     className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 font-mono text-sm text-slate-100 outline-none transition-colors focus:border-[#2060f0]"
-                    placeholder="sk-…"
+                    placeholder={INFO_PROVEEDOR[proveedor].placeholder}
                   />
                   <p className="mt-1.5 text-[11px] text-slate-600">
                     Obtenla en{" "}
                     <a
-                      href="https://platform.openai.com/api-keys"
+                      href={INFO_PROVEEDOR[proveedor].urlKey}
                       target="_blank"
                       rel="noreferrer"
                       className="text-[#00f0e0]/80 underline decoration-[#00f0e0]/30 hover:text-[#00f0e0]"
                     >
-                      platform.openai.com/api-keys
-                    </a>
+                      {INFO_PROVEEDOR[proveedor].urlKeyCorta}
+                    </a>{" "}
+                    ({INFO_PROVEEDOR[proveedor].nota})
                   </p>
                 </div>
 
@@ -457,9 +521,9 @@ export default function Home() {
                       onChange={(e) => setModelo(e.target.value)}
                       className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-4 py-2.5 font-mono text-sm text-slate-100 outline-none transition-colors focus:border-[#2060f0] [&>option]:bg-[#0a0f1e]"
                     >
-                      {(modelos.length > 0 ? modelos : MODELOS_BASE)
+                      {(modelos.length > 0 ? modelos : MODELOS_BASE[proveedor])
                         .concat(
-                          (modelos.length > 0 ? modelos : MODELOS_BASE).includes(modelo)
+                          (modelos.length > 0 ? modelos : MODELOS_BASE[proveedor]).includes(modelo)
                             ? []
                             : [modelo],
                         )
@@ -673,11 +737,11 @@ export default function Home() {
             },
             {
               titulo: "Código listo para IA",
-              desc: "El Python generado incluye el agente completo y la conexión a OpenAI: el prompt se arma con el objetivo, personalidad, reglas y memoria del DSL.",
+              desc: "El Python generado incluye el agente completo y la conexión al modelo (Gemini u OpenAI): el prompt se arma con el objetivo, personalidad, reglas y memoria del DSL.",
             },
             {
-              titulo: "Modelo intercambiable",
-              desc: "El modelo se elige por variable de entorno (PANAI_MODELO): puedes cambiar de gpt-4o-mini a gpt-5.1 sin volver a traducir el programa.",
+              titulo: "Proveedor y modelo intercambiables",
+              desc: "Con variables de entorno (PANAI_PROVEEDOR, PANAI_MODELO) el mismo programa traducido puede usar Gemini (gratis) u OpenAI, sin volver a traducir.",
             },
           ].map((c) => (
             <div
@@ -695,8 +759,8 @@ export default function Home() {
           Construido con{" "}
           <span className="text-slate-400">Python + PLY (Lex/Yacc)</span> para el
           traductor · <span className="text-slate-400">Next.js</span> para esta
-          demo · <span className="text-slate-400">OpenAI API</span> para la
-          ejecución del agente
+          demo · <span className="text-slate-400">Gemini / OpenAI API</span> para
+          la ejecución del agente
         </p>
       </section>
 
